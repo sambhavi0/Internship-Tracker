@@ -1,25 +1,30 @@
 import { useState, useEffect } from "react";
 import "./App.css";
+import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { db } from "./firebase";
 
 function App() {
-  const [applications, setApplications] = useState(() => {
-  const stored = localStorage.getItem("applications");
-  return stored ? JSON.parse(stored) : [];
-});
- 
-  useEffect(() => {
-  localStorage.setItem(
-    "applications",
-    JSON.stringify(applications)
-  );
-}, [applications]);
+  const [applications, setApplications] = useState([]);
+useEffect(() => {
+  const fetchApplications = async () => {
+    const querySnapshot = await getDocs(collection(db, "applications"));
+    const apps = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setApplications(apps);
+  };
+
+  fetchApplications();
+}, []);
 
   const [statusFilter, setStatusFilter] = useState("all");
 
+  async function handleDelete(id) {
+  await deleteDoc(doc(db, "applications", id));
+  setApplications(applications.filter((app) => app.id !== id));
+}
 
-  function handleDelete(index) {
-    setApplications(applications.filter((_, idx) => idx !== index));
-  }
 
   const [formData, setFormData] = useState({
     company: "",
@@ -28,11 +33,26 @@ function App() {
     date: ""
   });
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    setApplications([...applications, formData]);
-  }
-  const filteredApplications =
+  async function handleSubmit(e) {
+  e.preventDefault();
+
+  await addDoc(collection(db, "applications"), formData);
+
+  setFormData({
+    company: "",
+    role: "",
+    status: "",
+    date: ""
+  });
+
+  const querySnapshot = await getDocs(collection(db, "applications"));
+  const apps = querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+  setApplications(apps);
+}
+const filteredApplications =
   statusFilter === "all"
     ? applications
     : applications.filter(app => app.status === statusFilter);
@@ -87,12 +107,12 @@ return (
     </select>
     
     {filteredApplications.map((app, idx) => (
-      <div className="card" key={idx}>
+      <div className="card" key={app.id}>
         <p> Company: {app.company}</p>
         <p>Role: {app.role}</p>
         <p>Status: {app.status}</p>
         <p>Date: {app.date}</p>
-        <button className="delete" onClick={() => handleDelete(idx)}>Delete</button>
+        <button className="delete" onClick={() => handleDelete(app.id)}>Delete</button>
       </div>
     
     ))}
